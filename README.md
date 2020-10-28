@@ -1,3 +1,3 @@
 My GitHub page is located at:
 
-https://github.com/BU-IE-582/fall20-ilkerzeybek
+https://bu-ie-582.github.io/fall20-ilkerzeybek/
