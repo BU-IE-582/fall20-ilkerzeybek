@@ -16,4 +16,9 @@ Hello, my name is İlker Zeybek. This webpage contains my own work for IE 582 ho
 [Here](Homework 2/hw2rmd.Rmd) is RMarkdown file for Homework 2.<br/>
 [Here](Homework 2/hw2rmd.html) is Homework 2 report.
 
+## Homework 2
+[Here](Homework 3/hw3script.R) is R Script for Homework 2.<br/>
+[Here](Homework 3/) is RMarkdown file for Homework 2. (Coming Soon)<br/>
+[Here](Homework 3/) is Homework 2 report. (Coming Soon)
+
 
