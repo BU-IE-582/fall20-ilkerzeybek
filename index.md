@@ -18,7 +18,7 @@ Hello, my name is İlker Zeybek. This webpage contains my own work for IE 582 ho
 
 ## Homework 3
 [Here](Homework 3/hw3script.R) is R Script for Homework 3.<br/>
-[Here](Homework 3/) is RMarkdown file for Homework 3. (Coming Soon)<br/>
-[Here](Homework 3/) is Homework 3 report. (Coming Soon)
+[Here](Homework 3/hw3rmd.Rmd) is RMarkdown file for Homework 3.<br/>
+[Here](Homework 3/hw3rmd.html) is Homework 3 report.
 
 
