@@ -1,0 +1,162 @@
+---
+title: "Spam Mail Classification"
+author: "İlker Zeybek"
+date: "January 29, 2021"
+output: html_document
+---
+
+# Introduction
+
+Spam mails are the unwanted mails that may contain malicious spywares in order to scam you. Mailing services have to classify incoming mails as spam or not for achieving the maximum security of their users while increasing their customer base and their profits. This homework is about tuning the hyperparameters of classification algorithms, namely Random Forest Classifier and Stochastic Gradient Boosting Classifier.
+
+# Dataset Info
+
+The "spam" concept is diverse: advertisements for products/web sites, make money fast schemes, chain letters, pornography... The collection of spam e-mails came from the postmaster and individuals who had filed spam. The collection of non-spam e-mails came from filed work and personal e-mails, and hence the word 'george' and the area code '650' are indicators of a non-spam. These are useful when constructing a personalized  spam filter.  One would either have to blind such non-spam indicators or get a very wide collection of non-spam to generate a general purpose spam filter.
+
+The last column of spambase data denotes whether the e-mail was considered spam (1) or not (0), i.e. unsolicited commercial e-mail. Most of the attributes indicate whether a particular word or character was frequently occurring in the e-mail.  The run-length attributes (55-57) measure the length of sequences of consecutive capital letters. Here are the definitions of the attributes:
+
+- 48 continuous real [0,100] attributes of type word_freq_WORD 
+= percentage of words in the e-mail that match WORD,
+i.e. 100 * (number of times the WORD appears in the e-mail) / 
+total number of words in e-mail.  A "word" in this case is any 
+string of alphanumeric characters bounded by non-alphanumeric 
+characters or end-of-string.
+
+- 6 continuous real [0,100] attributes of type char_freq_CHAR
+= percentage of characters in the e-mail that match CHAR,
+i.e. 100 * (number of CHAR occurrences) / total characters in e-mail
+
+- 1 continuous real [1,...] attribute of type capital_run_length_average
+= average length of uninterrupted sequences of capital letters
+
+- 1 continuous integer [1,...] attribute of type capital_run_length_longest
+= length of longest uninterrupted sequence of capital letters
+
+- 1 continuous integer [1,...] attribute of type capital_run_length_total
+= sum of length of uninterrupted sequences of capital letters
+= total number of capital letters in the e-mail
+
+- 1 nominal {0,1} class attribute of type spam
+= denotes whether the e-mail was considered spam (1) or not (0), 
+i.e. unsolicited commercial e-mail.  
+
+
+# Initial Data Analysis
+
+Firstly, I have loaded the necessary libraries for building the classification models and MLmetrics library for evaluating their performance.
+
+```{r}
+#Loading necessary packages
+library(caret)
+library(ranger)
+library(MLmetrics)
+```
+
+After loading the packages, I have loaded the data into R, and set the seed for reproducibility of my work.
+
+```{r}
+#Setting the seed and reading the data
+data <- read.csv("spambase.csv")
+set.seed(582)
+```
+
+After looking into the features of the data set, I have noticed that target variable is not a factor, therefore I have converted it into factor class and assigned level names as "No" and "Yes" for their respective classes.
+
+```{r}
+#Changing output class to factor and renaming levels of it.
+str(data)
+data$class <- as.factor(data$class)
+levels(data$class) <- c("No", "Yes")
+```
+
+Then, I have checked how many instances of not spam mails and spam mails present in the data set, there isn't any significant imbalance between the classes.
+
+```{r}
+#Counts of not spam and spam mails
+table(data$class)
+```
+
+# Model Building
+
+In order to build classification models, I have to divide data set into train and test sets. By randomly sampling 80% of the row indices, I have created the training set. The remaining rows forming the test set.
+
+```{r}
+#Split data into train and test
+train_indices <- sample(1:4601, 4601*0.8)
+train <- data[train_indices,]
+test <- data[-train_indices,]
+```
+
+## Random Forest Classifier
+
+After splitting the data, I have started modeling with the Random Forest classifier. We have to tune the "mtry" hyperparameter in this model according to our homework assignment. Firstly, I have created the 10-folds for cross-validation with 1 repeat. Then I have conducted a grid search for best mtry parameter while keeping minimum node size at 5, number of trees at 500 while using gini index. I have searched the best setting in 2, 5, 7, 9, 11, 13 mtry values. According to the results of the grid search:
+
+- Optimal mtry = 5.
+
+This means Random Forest Algorithm will use 5 randomly sampled features as candidates at each split.
+
+```{r eval=FALSE}
+folds <- createMultiFolds(train$class, k = 10, times = 1)
+control <- trainControl(method = "cv", number = 10, verboseIter = TRUE, summaryFunction = twoClassSummary,
+                        classProbs = TRUE, savePredictions = TRUE, index = folds, allowParallel = TRUE)
+tune_grid <- expand.grid(mtry = c(2, 5, 7, 9, 11, 13), splitrule = "gini", min.node.size = 5)
+rf_gridsearch <- train(class ~., data = train, method = "ranger", metric = "Accuracy",
+                       tuneGrid = tune_grid, trControl = control, num.trees = 500)
+```
+
+For the evaluation of the model, I have used the Accuracy metric. Random Forest classifier has 0.9522258 accuracy, which is pretty impressive considering our data set has 60%-40% balance of the output.
+
+```{r fig.align = "center"}
+rf_gridsearch
+plot(rf_gridsearch)
+predictions <- predict(rf_gridsearch, newdata = test)
+Accuracy(predictions, test$class)
+ConfusionMatrix(predictions, test$class)
+```
+
+When we compare the Accuracy of the model on the training set, we see that accuracy is pretty high, 0.9918478. Therefore, we can conclude that model slightly overfits the training data, but it is negligible due to the high performance metric on the test data.
+
+```{r}
+predictions <- predict(rf_gridsearch, newdata = train)
+Accuracy(predictions, train$class)
+```
+
+
+## Stochastic Gradient Boosting Classifier
+
+In the GBM model, we have to tune our depth, learning rate, and number of trees hyper paramteter according to our homework assignment. Since my computer is not good at computing the grid search results for many parameter values, I have used less parameter levels for this classification algorithm. According to the grid search for best hyper parameters:
+
+- Optimal Number of trees = 1000.
+- Optimal Depth = 5.
+- Optimal Learning Rate = 0.01.
+
+Increasing the number of trees reduces the error on training set, but setting it too high may lead to over-fitting. Depth is the number of splits GBM has to perform on a tree (starting from a single node). In the context of GBMs, shrinkage is used for reducing, or shrinking, the impact of each additional fitted base-learner (tree). It reduces the size of incremental steps and thus penalizes the importance of each consecutive iteration.
+
+```{r eval=FALSE}
+folds <- createMultiFolds(train$class, k = 10, times = 1)
+control <- trainControl(method = "cv", number = 10, verboseIter = TRUE, summaryFunction = twoClassSummary,
+                        classProbs = TRUE, savePredictions = TRUE, index = folds, allowParallel = TRUE)
+tune_grid <- expand.grid(interaction.depth=c(1, 3, 5), n.trees = c(500, 1000), shrinkage=c(0.01, 0.001), n.minobsinnode = 10)
+gbm_gridsearch <- train(class ~., data = train, method = "gbm", metric = "Accuracy", tuneGrid = tune_grid, trControl = control)
+```
+
+For evaluating the GBM model, I have used the Accuracy metric. Stochastic GBM classifier has 0.9359392 accuracy, which is impressive, but it is worse than the Random Forest Classifier.
+
+```{r fig.align="center"}
+gbm_gridsearch
+plot(gbm_gridsearch)
+predictions <- predict(gbm_gridsearch, newdata = test)
+Accuracy(predictions, test$class)
+ConfusionMatrix(predictions, test$class)
+```
+
+When we compare the Accuracy of the model on the training set, we see that accuracy is higher than on the test set, 0.963587 Therefore, we can conclude that model slightly overfits the training data, but it is negligible due to the high performance metric on the test data.
+
+```{r}
+predictions <- predict(gbm_gridsearch, newdata = train)
+Accuracy(predictions, train$class)
+```
+
+# Conclusion
+
+As a result, I can clearly state that Random Forest Classifier performs better than Stochastic GBM Classifier on this data. Random Forest Classifier slightly overfits more than the Stochastic GBM Classifier, but it is negligible becuase of high accuracy on the test set.

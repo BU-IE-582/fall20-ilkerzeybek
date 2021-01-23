@@ -1,0 +1,160 @@
+---
+title: "Blood Test Results Classification"
+author: "İlker Zeybek"
+date: "January 29, 2021"
+output: html_document
+---
+
+# Introduction
+
+Blood tests are often conducted in order to explore how is the current situation in the human body. These results may indicate life-threatening damages in the interior organs, such as liver. With the blood results dataset, I will try to classify people according to their current situation of the liver healths. This homework is about tuning the hyperparameters of classification algorithms, namely Random Forest Classifier and Stochastic Gradient Boosting Classifier.
+
+# Dataset Info
+
+The target attribute for classification is named "Category" (blood donors vs. Hepatitis C (including its progress ('just' Hepatitis C, Fibrosis, Cirrhosis).
+
+All attributes except Category and Sex are numerical. The laboratory data are the attributes 5-14.
+
+- X (Patient ID/No.)
+- Category (diagnosis) (values: '0=Blood Donor', '0s=suspect Blood Donor', '1=Hepatitis', '2=Fibrosis', '3=Cirrhosis')
+- Age (in years)
+- Sex (f,m)
+- ALB
+- ALP
+- ALT
+- AST
+- BIL
+- CHE
+- CHOL
+- CREA
+- GGT
+- PROT
+
+These features are corresponding to the certain liver enzymes that can be measured from the person's blood.
+
+# Data Manipulation
+
+Firstly, I have loaded the libraries that I will need in the future steps.
+
+```{r}
+#Loading necessary libraries
+library(caret)
+library(ranger)
+library(MLmetrics)
+```
+
+Then, I have loaded the dataset into R and set the seed for reproducibility.
+
+```{r}
+#Setting the seed and reading the data
+set.seed(582)
+data <- read.csv("hcvdat0.csv", stringsAsFactors = T)
+```
+
+After looking at the data attributes, I have removed the rows that include NA values.
+
+```{r}
+#Removing NA observations
+str(data)
+data <- na.omit(data)
+```
+
+I have removed the ID column since it is a non-predictive feature. After removing the ID column, I have renamed the levels of the output "Category", in order to be able to use it with the caret package.
+
+```{r}
+#Removing the ID column and renaming the output factor levels to use in caret package
+data <- data[,2:14]
+levels(data$Category) <- c("BloodDonor", "SuspectBloodDonor", "Hepatitis", "Fibrosis", "Cirrhosis")
+```
+
+# Model Building
+
+In order to build classification models, I have to divide data set into train and test sets. By randomly sampling 600% of the row indices, I have created the training set. The remaining rows forming the test set. I have chosen 60% to achieve 200+ test observations.
+
+```{r}
+#Splitting the data into train and test sets
+train_indices <- sample(1:615, 615*0.60)
+train <- data[train_indices,]
+test <- data[-train_indices,]
+```
+
+Since the data is heavily imbalanced in favor of BloodDonor class, I have calculated a baseline accuracy to compare with the built models. 0.8666667 is the baseline accuracy.
+
+```{r}
+#Baseline accuracy if we say everyone is blood donor since blood donor category dominates the output classes.
+sum(data$Category == "BloodDonor") / nrow(data)
+```
+
+## Random Forest Classifier
+
+After splitting the data, I have started modeling with the Random Forest classifier. We have to tune the “mtry” hyperparameter in this model according to our homework assignment. Firstly, I have created the 10-folds for cross-validation with 3 repeats. Since the observations are fewer than the other data sets, I have used 3 repeats this time. Then I have conducted a grid search for best mtry parameter while keeping minimum node size at 5, number of trees at 500 while using gini index. I have searched the best setting in 2, 5, 7, 10 mtry values. According to the results of the grid search:
+
+-Optimal mtry = 2.
+
+This means Random Forest Algorithm will use 2 randomly sampled features as candidates at each split.
+
+```{r eval=FALSE}
+#RF tuning
+folds <- createMultiFolds(train$Category, k = 10, times = 3)
+control <- trainControl(method = "cv", number = 10, verboseIter = TRUE,
+                        classProbs = TRUE, savePredictions = TRUE, index = folds, allowParallel = TRUE)
+tune_grid <- expand.grid(mtry = c(2,5,7,10), splitrule = "gini", min.node.size = 5)
+rf_gridsearch <- train(Category~., train, method = "ranger", tuneGrid = tune_grid, trControl = control)
+```
+
+For the evaluation of the model, I have used the Accuracy metric. Random Forest classifier has 0.9409283 accuracy, which is much higher than the baseline accuracy. Having an accuracy metric higher than the baseline accuracy indicates that Random Forest Classifier is successful in classifying the other 4 classes(SuspectBloodDonor, Hepatitis, Fibrosis, and Cirrhosis) too.
+
+```{r fig.align="center"}
+rf_gridsearch
+plot(rf_gridsearch)
+predictions <- predict(rf_gridsearch, newdata = test)
+Accuracy(predictions, test$Category)
+ConfusionMatrix(predictions, test$Category)
+```
+
+When we compare the accuracy of the model on the training set, we see that accuracy is perfect, which is 1. Therefore, we can conclude that model overfits the training data. Since our dataset has heavily imbalanced targets, It may be normal to have perfect fit on the training set. Still having a 0.9409283 accuracy over test set with 0.8666667 baseline accuracy is a good result.
+
+```{r}
+predictions <- predict(rf_gridsearch, newdata = train)
+Accuracy(predictions, train$Category)
+```
+
+## Stochastic Gradient Boosting Classifier
+
+In the GBM model, we have to tune our depth, learning rate, and number of trees hyper parameter according to our homework assignment. Since my computer is not good at computing the grid search results for many parameter values, I have used less parameter levels for this classification algorithm. According to the grid search for best hyperparameters:
+
+- Optimal Number of trees = 400.
+- Optimal Depth = 5.
+- Optimal Learning Rate = 0.01.
+
+Increasing the number of trees reduces the error on training set, but setting it too high may lead to over-fitting. Depth is the number of splits GBM has to perform on a tree (starting from a single node). In the context of GBMs, shrinkage is used for reducing, or shrinking, the impact of each additional fitted base-learner (tree). It reduces the size of incremental steps and thus penalizes the importance of each consecutive iteration.
+
+```{r eval=FALSE}
+folds <- createMultiFolds(train$Category, k = 10, times = 3)
+control <- trainControl(method = "cv", number = 10, verboseIter = TRUE,
+                        classProbs = TRUE, savePredictions = TRUE, index = folds, allowParallel = TRUE)
+tune_grid <- expand.grid(interaction.depth = c(1, 3, 5), n.trees = (1:50) * 50, shrinkage = c(0.01, 0.001), n.minobsinnode=10)
+gbm_gridsearch <- train(Category~., data = train, method = "gbm", tuneGrid= tune_grid, trControl = control)
+```
+
+For the evaluation of the model, I have used the Accuracy metric. Stochastic GBM classifier has 0.9451477 accuracy, which is much higher than the baseline accuracy and slightly higher than the Random Forest Classifier. Having an accuracy metric higher than the baseline accuracy indicates that Stochastic GBM Classifier is successful in classifying the other 4 classes (SuspectBloodDonor, Hepatitis, Fibrosis, and Cirrhosis) too.
+
+```{r fig.align="center"}
+gbm_gridsearch
+plot(gbm_gridsearch)
+predictions <- predict(gbm_gridsearch, newdata = test)
+Accuracy(predictions, test$Category)
+ConfusionMatrix(predictions, test$Category)
+```
+
+When we compare the accuracy of the model on the training set, we see that accuracy is perfect, which is 1. Therefore, we can conclude that model overfits the training data. Since our dataset has heavily imbalanced targets, It may be normal to have perfect fit on the training set. Still having a 0.9451477 accuracy over test set with 0.8666667 baseline accuracy is a good result.
+
+```{r}
+predictions <- predict(gbm_gridsearch, newdata = train)
+Accuracy(predictions, train$Category)
+```
+
+
+# Conclusion
+
+As a conclusion, best performing classifier in this dataset is Stochastic Gradient Boosting Classifier. It has 0.9451477 accuracy, which is higher than the baseline accuracy I have defined in the beginning of the report. Since the dataset is heavly imbalanced in favor of "BloodDonor" class, the model accuracies may be lower than calculated accuracies above when new instances of the inputs are introduced to the model.

@@ -1,0 +1,269 @@
+---
+title: "Telco User Churn Classification"
+author: "İlker Zeybek"
+date: "January 29, 2021"
+output: html_document
+---
+
+# Introduction
+
+Predicting the customer behaviour is important for retaining them in the service for maximizing the profit of the businesses. Therefore, we can gain important insights from a certain characteristics of a customers that churned or retained. This homework is about tuning the hyperparameters of classification algorithms, namely Random Forest Classifier and Stochastic Gradient Boosting Classifier.
+
+# Dataset Info
+
+In this dataset, each row represents a customer, each column contains customer’s attributes described. The raw data contains 7043 rows (customers) and 21 columns (features). The “Churn” column is our target. The data set includes information about:
+
+- Customer ID: Customer ID
+- Gender: Whether the customer is a male or a female
+- SeniorCitizen: Whether the customer is a senior citizen or not (1, 0)
+- Partner: Whether the customer has a partner or not (Yes, No)
+- Dependents: Whether the customer has dependents or not (Yes, No)
+- Tenure: Number of months the customer has stayed with the company   
+- PhoneService: Whether the customer has a phone service or not (Yes, No)
+- MultipleLines: Whether the customer has multiple lines or not (Yes, No, No phone service)
+- InternetService: Customer’s internet service provider (DSL, Fiber optic, No)
+- OnlineSecurity: Whether the customer has online security or not (Yes, No, No internet service)
+- OnlineBackup: Whether the customer has online backup or not (Yes, No, No internet service)
+- DeviceProtection: Whether the customer has device protection or not (Yes, No, No internet service)
+- TechSupport: Whether the customer has tech support or not (Yes, No, No internet service)
+- StreamingTV: Whether the customer has streaming TV or not (Yes, No, No internet service)
+- StreamingMovies: Whether the customer has streaming movies or not (Yes, No, No internet service)
+- Contract: The contract term of the customer (Month-to-month, One year, Two year)
+- PaperlessBilling: Whether the customer has paperless billing or not (Yes, No)
+- PaymentMethod: The customer’s payment method (Electronic check, Mailed check, Bank transfer (automatic), Credit card (automatic))
+- MonthlyCharges: The amount charged to the customer monthly
+- TotalCharges: The total amount charged to the customer
+- Churn: Whether the customer churned or not (Yes or No)
+
+# Data Manipulation and Preparation
+
+Firstly, I have loaded the necessary packages for future needs.
+
+```{r}
+#Loading the necessary packages
+library(randomForest)
+library(caret)
+library(e1071)
+library(ranger)
+library(MLmetrics)
+```
+
+Then, I have loaded the data into R and set the seed for reproducibility.
+
+```{r}
+#Reading the data and setting the seed
+data <- read.csv("churn.csv", stringsAsFactors = T)
+set.seed(582)
+```
+
+As a first look, I have checked whether there is a missing data. After finding few missing values, I have omitted them, because there is not much missing data that will effect the results.
+
+```{r}
+#Removing NAs from the dataset
+str(data)
+sapply(data, function(x) sum(is.na(x)))
+data <- na.omit(data)
+```
+
+After that, I have normalized the numerical columns, which are MonthlyCharges and TotalCharges, in order to handle highly varying values in these columns.
+
+```{r}
+data[, 19:20] <- scale(data[, 19:20])
+```
+
+After normalizing the numerical columns, I have created a factors out of the Tenure feature. Classified the customers as their membership years. Then, handled all of the categorical variables in the data set by renaming their levels. Lastly, I have removed the customer ID column, which is pretty obvious that it is a non-predictive feature.
+
+```{r}
+for(i in 1:nrow(data)){
+  if(data[i, "tenure"] >= 0 & data[i, "tenure"] <= 12){
+    data$tenure[i] <- "0-1 years"
+  }else if(data[i, "tenure"] > 12 & data[i, "tenure"] <= 24){
+    data$tenure[i] <- "1-2 years"
+  }else if(data[i, "tenure"] > 24 & data[i, "tenure"] <= 36){
+    data$tenure[i] <- "2-3 years"
+  }else if(data[i, "tenure"] > 36 & data[i, "tenure"] <= 48){
+    data$tenure[i] <- "3-4 years"
+  }else if(data[i, "tenure"] > 48 & data[i, "tenure"] <= 60){
+    data$tenure[i] <- "4-5 years" 
+  }else{
+    data$tenure[i] <- "More than 5 years"
+  }
+}
+data$tenure <- factor(data$tenure)
+#Converting SeniorCitizen as a factor
+data$SeniorCitizen <- as.factor(ifelse(data$SeniorCitizen == 1, "Yes", "No"))
+#Converting "No", "No internet service" and "Yes" into categorical variables with 2 levels
+levels(data$MultipleLines) <- c("No","No","Yes")
+levels(data$OnlineSecurity) <- c("No","No","Yes")
+levels(data$OnlineBackup) <- c("No","No","Yes")
+levels(data$DeviceProtection) <- c("No","No","Yes")
+levels(data$TechSupport) <- c("No","No","Yes")
+levels(data$StreamingTV) <- c("No","No","Yes")
+levels(data$StreamingMovies) <- c("No","No","Yes")
+#Removing the ID column
+data <- data[,2:21]
+```
+
+# Model Building
+
+In order to build classification models, I have to divide data set into train and test sets. By randomly sampling 70% of the row indices, I have created the training set. The remaining rows forming the test set.
+
+```{r}
+#Split test-train
+train_indices <- sample(1:7032, 7032*0.7)
+train <- data[train_indices,]
+test <- data[-train_indices,]
+```
+
+Since the output classes are imbalanced, I have to set a baseline accuracy. This baseline accuracy is the accuracy that if I label every outcome as "No" churn.
+
+```{r}
+#Baseline accuracy if we say "No churn" to every customer.
+sum(data$Churn == "No") / nrow(data)
+```
+
+## Random Forest Classifier
+
+After splitting the data, I have started modeling with the Random Forest classifier. We have to tune the “mtry” hyperparameter in this model according to our homework assignment. Firstly, I have created the 10-folds for cross-validation with 1 repeat. Then I have conducted a grid search for best mtry parameter while keeping minimum node size at 5, number of trees at 500 while using gini index. I have searched the best setting in 2, 5, 7, 9, 11, 13 mtry values. According to the results of the grid search:
+
+- Optimal mtry = 2.
+
+This means Random Forest Algorithm will use 2 randomly sampled features as candidates at each split.
+
+```{r eval=FALSE}
+folds <- createMultiFolds(train$Churn, k = 10, times = 1)
+control <- trainControl(method = "cv", number = 10, verboseIter = TRUE, summaryFunction = twoClassSummary,
+                        classProbs = TRUE, savePredictions = TRUE, index = folds, allowParallel = TRUE)
+tune_grid <- expand.grid(mtry = c(2, 5, 7, 9, 11, 13), splitrule = "gini", min.node.size = 5)
+rf_gridsearch <- train(Churn ~., data = train, method = "ranger", metric = "Accuracy",
+                       tuneGrid = tune_grid, trControl = control, num.trees = 500)
+```
+
+For the evaluation of the model, I have used the Accuracy metric. Random Forest classifier has 0.7947867 accuracy, which is only 6% higher than the baseline accuracy. It is not an impressive result for a Random Forest Classifier.
+
+```{r fig.align="center"}
+rf_gridsearch
+plot(rf_gridsearch)
+predictions <- predict(rf_gridsearch, newdata = test)
+Accuracy(predictions, test$Churn)
+ConfusionMatrix(predictions, test$Churn)
+```
+
+When we compare the accuracy of the model on the training set, we see that accuracy is higher than what we observed on the test set, 0.8577814. Therefore, we can conclude that model slightly overfits the training data. Since the baseline accuracy is still close to the Random Forest Classifier, we can not conclude that it is a good model for this dataset until now.
+
+```{r}
+predictions <- predict(rf_gridsearch, newdata = train)
+Accuracy(predictions, train$Churn)
+```
+
+## Stochastic Gradient Boosting Classifier
+
+In the GBM model, we have to tune our depth, learning rate, and number of trees hyper paramteter according to our homework assignment. Since my computer is not good at computing the grid search results for many parameter values, I have used less parameter levels for this classification algorithm. According to the grid search for best hyperparameters:
+
+- Optimal Number of trees = 1000.
+- Optimal Depth = 3.
+- Optimal Learning Rate = 0.01.
+
+Increasing the number of trees reduces the error on training set, but setting it too high may lead to over-fitting. Depth is the number of splits GBM has to perform on a tree (starting from a single node). In the context of GBMs, shrinkage is used for reducing, or shrinking, the impact of each additional fitted base-learner (tree). It reduces the size of incremental steps and thus penalizes the importance of each consecutive iteration.
+
+```{r eval=FALSE}
+folds <- createMultiFolds(train$Churn, k = 10, times = 1)
+control <- trainControl(method = "cv", number = 10, verboseIter = TRUE, summaryFunction = twoClassSummary,
+                        classProbs = TRUE, savePredictions = TRUE, index = folds, allowParallel = TRUE)
+tune_grid <- expand.grid(interaction.depth=c(1, 3, 5), n.trees = c(500, 1000), shrinkage=c(0.01, 0.001), n.minobsinnode = 10)
+gbm_gridsearch <- train(Churn ~., data = train, method = "gbm", metric = "Accuracy", tuneGrid = tune_grid, trControl = control)
+```
+
+For evaluating the GBM model, I have used the accuracy metric. Stochastic GBM classifier has 0.8014218 accuracy, which is better than the Random Forest Classifier. Since we have 0.734215 baseline accuracy, Stochastic GBM is not performing good enough like Random Forest Classifier while being better.
+
+```{r fig.align="center"}
+gbm_gridsearch
+plot(gbm_gridsearch)
+predictions <- predict(gbm_gridsearch, newdata = test)
+Accuracy(predictions, test$Churn)
+ConfusionMatrix(predictions, test$Churn)
+```
+
+When we compare the accuracy of the model on the training set, we see that accuracy is slightly higher than on the test set, 0.8169443. The difference in the accuracies are so low that we can clearly say that Stochastic GBM fits really well and equally good to the bot train and test sets. This indicates that we have a sweet spot between underfitting and overfitting.
+
+```{r}
+predictions <- predict(gbm_gridsearch, newdata = train)
+Accuracy(predictions, train$Churn)
+```
+
+## Weighted Random Forest Classifier
+
+Since we have imbalanced dataset, I have introduced the weights of the classes into the algorithm. According to the grid search for besthyper parameters:
+
+- Optimal mtry = 2.
+
+This means Random Forest Algorithm will use 2 randomly sampled features as candidates at each split.
+
+```{r eval=FALSE}
+model_weights <- ifelse(train$Churn == "No",
+                        sum(train$Churn == "No")/nrow(train),
+                        sum(train$Churn == "Yes")/nrow(train))
+folds <- createMultiFolds(train$Churn, k = 10, times = 1)
+control <- trainControl(method = "cv", number = 10, verboseIter = TRUE, summaryFunction = twoClassSummary,
+                        classProbs = TRUE, savePredictions = TRUE, index = folds, allowParallel = TRUE)
+tune_grid <- expand.grid(mtry = c(2, 5, 7, 9, 11, 13), splitrule = "gini", min.node.size = 5)
+weighted_rf_gridsearch <- train(Churn ~., data = train, method = "ranger", weights = model_weights,
+                       metric = "Accuracy", tuneGrid = tune_grid, trControl = control, num.trees = 500)
+```
+
+For the evaluation of the model, I have used the accuracy metric. Weighted Random Forest classifier has 0.7421801 accuracy, which is only 1% higher than the baseline accuracy, and it is way worse than the normal Random Forest Classifier.
+
+```{r}
+weighted_rf_gridsearch
+plot(weighted_rf_gridsearch)
+predictions <- predict(weighted_rf_gridsearch, newdata = test)
+Accuracy(predictions, test$Churn)
+ConfusionMatrix(predictions, test$Churn)
+```
+
+When we compare the accuracy of the model on the training set, we see that accuracy is higher than what we observed on the test set, 0.7551808. There isn't any significant difference between training accuracy and test accuracy, therefore model fits both datasets equally. There isn't any concern for underfitting or overfitting.
+
+```{r}
+predictions <- predict(weighted_rf_gridsearch, newdata = train)
+Accuracy(predictions, train$Churn)
+```
+
+## Weighted Stochastic Gradient Boosting Classifier
+
+In the GBM model, we have to tune our depth, learning rate, and number of trees hyper paramteter according to our homework assignment. Since my computer is not good at computing the grid search results for many parameter values, I have used less parameter levels for this classification algorithm. According to the grid search for best hyperparameters:
+
+- Optimal Number of trees = 1000.
+- Optimal Depth = 3.
+- Optimal Learning Rate = 0.01.
+
+Increasing the number of trees reduces the error on training set, but setting it too high may lead to over-fitting. Depth is the number of splits GBM has to perform on a tree (starting from a single node). In the context of GBMs, shrinkage is used for reducing, or shrinking, the impact of each additional fitted base-learner (tree). It reduces the size of incremental steps and thus penalizes the importance of each consecutive iteration.
+
+```{r eval=FALSE}
+folds <- createMultiFolds(train$Churn, k = 10, times = 1)
+control <- trainControl(method = "cv", number = 10, verboseIter = TRUE, summaryFunction = twoClassSummary,
+                        classProbs = TRUE, savePredictions = TRUE, index = folds, allowParallel = TRUE)
+tune_grid <- expand.grid(interaction.depth=c(1, 3, 5), n.trees = c(500, 1000), shrinkage=c(0.01, 0.001), n.minobsinnode = 10)
+weighted_gbm_gridsearch <- train(Churn ~., data = train, method = "gbm", weights = model_weights,
+                        metric = "Accuracy", tuneGrid = tune_grid, trControl = control)
+```
+
+For evaluating the GBM model, I have used the accuracy metric. Stochastic GBM classifier has 0.7729858 accuracy, which is better than the Weighted Random Forest Classifier. Since we have 0.734215 baseline accuracy, Weighted Stochastic GBM is not performing good enough like Random Forest Classifier while being better. Lastly, the the model performed worse when we introduced weights into the model.
+
+```{r fig.align="center"}
+weighted_gbm_gridsearch
+plot(weighted_gbm_gridsearch)
+predictions <- predict(weighted_gbm_gridsearch, newdata = test)
+Accuracy(predictions, test$Churn)
+ConfusionMatrix(predictions, test$Churn)
+```
+
+When we compare the accuracy of the model on the training set, we see that accuracy is slightly higher than on the test set, 0.7909386. The difference in the accuracies are so low that we can clearly say that Weighted Stochastic GBM fits almost equally to the bot train and test sets. This indicates that we shouldn't think about underfitting or overfitting.
+
+```{r}
+predictions <- predict(weighted_gbm_gridsearch, newdata = train)
+Accuracy(predictions, train$Churn)
+```
+
+## Conclusion
+
+As a conclusion, best performing classifier in this dataset is Stochastic Gradient Boosting Classifier without weights. It has 0.8014218 accuracy, which is only ~7% higher than the baseline accuracy I have defined in the very beginning of the report. This result is not worth implementing in large scale business operations and probably it will make you lose some of your investment into this project. I should have to explore more classification algorithms on this dataset to achieve better accuracies, but it is beyond the scope of our course.

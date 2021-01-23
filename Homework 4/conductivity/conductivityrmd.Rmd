@@ -1,0 +1,116 @@
+---
+title: "Predicting Critical Temperature of a Superconductor"
+author: "İlker Zeybek"
+date: "January 29, 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+A superconductor is a substance that conducts electricity without resistance when it becomes colder than a "critical temperature." At this temperature, electrons can move freely through the material. Superconductors are different from ordinary conductors, even very good ones. Since this is a valuable property, predicting critical temperatures of the compounds is an important task. In this homework, I am assigned to tune hyperparameter "lambda" of lasso regression.
+
+# Dataset Info
+
+The data set includes atomic information of the compounds and the critical temperature of that input combination. The goal is to predict critical temperature of any given compound with known and easily measurable atomic information.
+
+# Data Analysis and Manipulation
+
+Since data have lots of columns, I have to filter them in order to achieve more robust and correct regression model. Firstly, I have loaded the necessary libraries for future works.
+
+```{r}
+#Loading necessary packages
+library(GGally)
+library(corrplot)
+library(caret)
+library(glmnet)
+```
+
+After that, I have loaded the data into R and set the seed for reproducibility.
+
+```{r}
+#Reading the data and setting the seed
+set.seed(582)
+cond <- read.csv("conductivity.csv")
+```
+
+After that, I have checked whether there is a missing entry in the dataset. Seems like data set does not contain any missing values.
+
+```{r}
+#No missing data
+sum(is.na(cond))
+```
+
+Later, I have removed the features with near zero variance, since they will not contribute anything to the prediction model. After that, I have removed the features that highly correlated, namely above abs(0.8).
+
+```{r}
+#Filtering the irrelevant features
+nearZeroVar(cond, freqCut = 90/10, names = T)
+cond <- subset(cond, select = -c(range_FusionHeat, range_ThermalConductivity))
+tmp <- cor(cond[, 1:42])
+tmp[upper.tri(tmp)] <- 0
+diag(tmp) <- 0
+data.new <- cond[,!apply(tmp, 2, function(x) any(abs(x) > 0.80))]
+data.new$CriticalTemp <- cond$critical_temp
+```
+
+# Model Building
+
+For the model building part, firstly, I have to split the dataset into train and test parts. I have splitted the dataset into train and test sets with 70%-30% ratio.
+
+```{r}
+#Split train test
+train_indices <- sample(1:21263, 21263*0.7)
+train <- data.new[train_indices,]
+test <- data.new[-train_indices,]
+```
+
+For the tuning part, I have to tune lambda parameter of the lasso regression. I have used 10-fold cross-validation for lambda tuning with glmnet package. Minimum value of the tuned lambda parameter is used in the glmnet function for building the lasso regression model.
+
+```{r}
+#Tune Lambda parameter and fit lasso regression
+lambdas <- 10^seq(2, -3, by = -.1)
+cv <- cv.glmnet(as.matrix(train[, -20]), as.matrix(train[, 20]), lambda = lambdas,
+                nfolds = 10)
+cv
+min_lambda <- cv$lambda.min
+lasso_model <- glmnet(as.matrix(train[, -20]),
+                      as.matrix(train[, 20]), alpha = 1,
+                      lambda = min_lambda)
+```
+
+After building the model, I have evaluated the model with the Root Mean Square Error and R Square metrics. 
+
+- RMSE = 22.17068
+- R Square = 0.5800331.
+
+```{r}
+#Lasso regression evaluation
+eval_results <- function(true, predicted, df) {
+  SSE <- sum((predicted - true)^2)
+  SST <- sum((true - mean(true))^2)
+  R_square <- 1 - SSE / SST
+  RMSE <- sqrt(SSE/nrow(df))
+  data.frame(
+    RMSE <- RMSE,
+    Rsquare <- R_square
+  )
+}
+lasso_predictions <- predict(lasso_model, newx = as.matrix(test[, -20]))
+eval_results(test[, 20], lasso_predictions, test)
+```
+
+The RMSE and R Square metrics for the training set.
+
+```{r}
+lasso_predictions <- predict(lasso_model, newx = as.matrix(train[, -20]))
+eval_results(train[, 20], lasso_predictions, train)
+```
+
+
+# Conclusion
+
+As can be clearly seen from the above metrics, lasso regression is not a good fit for this dataset because it only describes the ~58% of the variability in the critical temperature output. Also it can be clearly said that underfitting or overfitting is not the case for the lasso regression model since the training RMSE and R Square metrics is closer to the test set metrics. We have to evaluate other models for better fit to this dataset. Random Forest Regressor, Ridge Regression, Bayesian Ridge Regression etc. may perform better on this dataset.
