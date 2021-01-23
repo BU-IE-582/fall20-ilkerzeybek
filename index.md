@@ -22,23 +22,23 @@ Hello, my name is İlker Zeybek. This webpage contains my own work for IE 582 ho
 [Here](Homework 3/hw3rmd.html) is Homework 3 report.
 
 ## Homework 4
-[Here](Homework 4/spambase/spambase.r) is R Script for Spam Mail Classification.<br/>
-[Here](Homework 4/spambase/spambasermd.rmd) is RMarkdown file for Spam Mail Classification.<br/>
+[Here](Homework 4/spambase/spambase.R) is R Script for Spam Mail Classification.<br/>
+[Here](Homework 4/spambase/spambasermd.Rmd) is RMarkdown file for Spam Mail Classification.<br/>
 [Here](Homework 4/spambase/spambasermd.html) is Spam Mail Classification Report.<br/>
 [Here](Homework 4/spambase/spambase.csv) is Spam Mail Dataset.<br/>
 
-[Here](Homework 4/blood/blood.r) is R Script for Blood Test Results Classification.<br/>
-[Here](Homework 4/blood/bloodrmd.rmd) is RMarkdown file for Blood Test Results Classification.<br/>
+[Here](Homework 4/blood/blood.Rmd) is R Script for Blood Test Results Classification.<br/>
+[Here](Homework 4/blood/bloodrmd.Rmd) is RMarkdown file for Blood Test Results Classification.<br/>
 [Here](Homework 4/blood/bloodrmd.html) is Blood Test Results Classification Report.<br/>
 [Here](Homework 4/blood/hcvdat0.csv) is Blood Test Results Dataset.<br/>
 
 
-[Here](Homework 4/churn/churn.r) is R Script for Telco Customer Churn Classification.<br/>
-[Here](Homework 4/churn/churnrmd.rmd) is RMarkdown file for Telco Customer Churn Classification.<br/>
+[Here](Homework 4/churn/churn.R) is R Script for Telco Customer Churn Classification.<br/>
+[Here](Homework 4/churn/churnrmd.Rmd) is RMarkdown file for Telco Customer Churn Classification.<br/>
 [Here](Homework 4/churn/churnrmd.html) is Telco Customer Churn Classification Report.<br/>
 [Here](Homework 4/churn/churn.csv) is Telco Customer Churn Dataset.<br/>
 
-[Here](Homework 4/conductivity/conductivity.r) is R Script for Predicting Critical Temperature of a Superconductor.<br/>
-[Here](Homework 4/conductivity/conductivityrmd.rmd) is RMarkdown file for Predicting Critical Temperature of a Superconductor.<br/>
+[Here](Homework 4/conductivity/conductivity.R) is R Script for Predicting Critical Temperature of a Superconductor.<br/>
+[Here](Homework 4/conductivity/conductivityrmd.Rmd) is RMarkdown file for Predicting Critical Temperature of a Superconductor.<br/>
 [Here](Homework 4/conductivity/conductivityrmd.html) is Predicting Critical Temperature of a Superconductor Report.<br/>
 [Here](Homework 4/conductivity/conductivity.csv) is Superconductor Dataset.
