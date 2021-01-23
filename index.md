@@ -25,7 +25,7 @@ Hello, my name is İlker Zeybek. This webpage contains my own work for IE 582 ho
 [Here](Homework 4/spambase/spambase.r) is R Script for Spam Mail Classification.<br/>
 [Here](Homework 4/spambase/spambasermd.rmd) is RMarkdown file for Spam Mail Classification.<br/>
 [Here](Homework 4/spambase/spambasermd.html) is Spam Mail Classification Report.<br/>
-[Here](Homework 4/blood/spambase.csv) is Spam Mail Dataset.<br/>
+[Here](Homework 4/spambase/spambase.csv) is Spam Mail Dataset.<br/>
 
 [Here](Homework 4/blood/blood.r) is R Script for Blood Test Results Classification.<br/>
 [Here](Homework 4/blood/bloodrmd.rmd) is RMarkdown file for Blood Test Results Classification.<br/>
