@@ -2,6 +2,11 @@
 
 Hello, my name is İlker Zeybek. This webpage contains my own work for IE 582 homeworks and project.
 
+## Project
+[Here](Project/project.R) is R Script for Project.<br/>
+[Here](Project/report.pdf) is Project Report.
+
+
 ## Homework 0
 [Here](Homework 0/homework0.Rmd) is RMarkdown file for Homework 0.<br/>
 [Here](Homework 0/homework0.html) is Homework 0.
